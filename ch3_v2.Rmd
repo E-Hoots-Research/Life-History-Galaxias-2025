@@ -2,41 +2,113 @@
 title: "Life History Attributes Influencing Metabolic Variation in an Estuarine Fish"
 author: "E. Hoots"
 date: "`r Sys.Date()`"
-output: html_document
+output: 
+html_document:
+code_download: true
+code_folding: hide
+depth: 4
+number_sections: no
+theme: cosmo
+toc: yes
+toc_float: yes
+toc_depth: 4
+knit: |
+  (function(input, ...) {
+    output_path <- rmarkdown::render(
+      input,
+      output_file = 'index.html',
+      envir = globalenv()
+    )
+    file.copy(output_path, "supplementary-file-1.html", overwrite = TRUE)
+    output_path
+  })
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+<!----------------------------->
 
-rm(list=ls())
+# READ ME
 
-### read in required packages
-library(ggplot2)
-library(dplyr)
-library(tidyr)
-library(wesanderson)
-library(readxl)
-library(ggpubr)
-library(grid)
-library(purrr)
-library(lme4)
-library(emmeans)
-library(multcomp)
-library(multcompView)
-library(lsmeans)
-```
+<!----------------------------->
 
 ## Which came first, the growth-chicken or the metabolism-egg?
 
 My third chapter will explore the influence of energy allocated to growth on the baseline metabolism (standard metabolic rate or SMR) of juvenile fish. SMR is usually measured on fasted, postprandial, resting individuals, although in theoretical best practice it is also measured on a non-reproductive adult individual (no energy allocated to growth). In this study, I aim to study the relative influence of both growth and reproductive development on the baseline metabolism of *Galaxias maculatus*. 
 
-#################################################################
-### Read in data from Hoots et al. (in prep) - hereafter "B1" ###
-#################################################################
+<!----------------------------->
+
+# CONTACT
+
+<!----------------------------->
+
+Elizabeth C. Hoots
+
+Email: beth.hoots@research.deakin.edu.au
+
+GitHub: https://github.com/Bhoots99
+
+Web: https://elizabeth-hoots.owlstown.net/
+
+
+```{r setup, include=FALSE}
+
+# KNIT SETTINGS
+
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE,
+	tidy = TRUE,
+	fig.align = "center"
+)
+
+```
+
+<!----------------------------->
+
+# LOAD REQUIRED PACKAGES
+
+<!----------------------------->
+
+```{r, message=FALSE, results='hide'}
+# installs and loads packages, need to install "pacman" first
+
+pacman::p_load("brms",
+               "broom",
+               "broom.mixed",
+               "car",
+               "coda",
+               "dplyr",
+               "emmeans",
+               "ggeffects",
+               "ggiraphExtra",
+               "ggplot2",
+               "ggpubr",
+               "grid",
+               "hms",
+               "lme4",
+               "lmerTest",
+               "lsmeans",
+               "lubridate",
+               "multcomp",
+               "multcompView",
+               "nlme",
+               "posterior",
+               "purrr",
+               "readxl",
+               "tidyr",
+               "wesanderson"
+)
+```
+
+<!------------------------------------------------------------->
+
+# Read in data from Hoots et al. (in prep) - hereafter "B1" 
+<!------------------------------------------------------------->
+
 
 ```{r}
 
-ds <- read.csv("C:/Users/s222141733/OneDrive - Deakin University/Beth Hoots/Chapter 3/workingtable.csv") # read in data table
+ds <- read.csv("001_Raw_Data/DS1_Hoots2025.csv") # read in data table
 
 month_order <- c("April", "May", "June", "July", "August", "September", "November", "March") # assign chronological order to Month (otherwise alphabetical)
 ds$Month <- factor(ds$Month, levels = month_order) # assign month_order to factor variable "Month" in ds
@@ -88,7 +160,7 @@ We are also interested in merging in some data on maturation in these fish, repr
 
 ```{r}
 #### let's also quickly take a look at those gut ratios 
-B1_gut <- read.csv("C:/Users/s222141733/OneDrive - Deakin University/Beth Hoots/Chapter 2 (2023 Growth Performance)/Analysis/Metadata/Otoliths and biometrics/GutRatio.csv")
+B1_gut <- read.csv("001_Raw_Data/GutRatio.csv")
 
 # Ensure Temp is correctly assigned
 B1_gut <- B1_gut %>%
@@ -288,12 +360,14 @@ ds1 <- ds1 %>%
 
 ```
 
-#############################################################
-### read in data from Hoots et al., 2024 - hereafter "B2" ###
-#############################################################
+<!------------------------------------------------------------->
+
+# read in data from Hoots et al., 2024 - hereafter "B2" 
+
+<!------------------------------------------------------------->
 
 ```{r}
-ds2 <- read.csv("C:/Users/s222141733/OneDrive - Deakin University/Beth Hoots/Chapter 1 (growth performance pilot)/Results/Processed/Ch3_ds2.csv")
+ds2 <- read.csv("001_Raw_Data/DS2_Hoots2024.csv")
 
 ds2<- ds2 %>%
   dplyr::mutate(
@@ -323,9 +397,11 @@ ds2<- ds2 %>%
 
 ```
 
-##############################################################
-### read in data from Skeeles et al., 2024 - hereafter "M" ###
-##############################################################
+<!------------------------------------------------------------->
+
+# read in data from Skeeles et al., 2024 - hereafter "M" 
+
+<!------------------------------------------------------------->
 
 ```{r}
 
@@ -365,9 +441,11 @@ ds3 <- ds3 %>%
 
 ```
 
-#################################################
-### merge 3 datasets into single master table ###
-#################################################
+<!------------------------------------------------------------->
+
+# merge 3 datasets into single master table 
+
+<!------------------------------------------------------------->
 
 ```{r}
 data <- bind_rows(ds1, ds2, ds3)
@@ -378,9 +456,12 @@ data$Month <- factor(data$Month, levels = month_order) # assign month_order to f
 
 ```
 
-###################################################
-### mass-standardize all SMR to grand mean mass ###
-###################################################
+<!------------------------------------------------------------->
+
+# mass-standardize all SMR to grand mean mass 
+
+<!------------------------------------------------------------->
+
 
 ```{r}
 
@@ -464,9 +545,11 @@ data <- data %>%
 ```
 
 
-###################################################
-### mass-standardize all MMR to grand mean mass ###
-###################################################
+<!------------------------------------------------------------->
+
+# mass-standardize all MMR to grand mean mass
+
+<!------------------------------------------------------------->
 
 ```{r}
 
@@ -532,9 +615,11 @@ data <- data %>%
 
 ```
 
-#####################
-### data analysis ###
-#####################
+<!------------------------------------------------------------->
+
+# data analysis
+
+<!------------------------------------------------------------->
 
 #### Linear regression through SGR and SMR, by temp and time interval
 
@@ -882,7 +967,7 @@ ggplot(data = data, aes(x = mass, y = SMR, color = factor(Temp))) +
   )
 
 
-lm_SMR <- lmer(log10(SMR) ~ log_mass*factor(Temp), data = data)
+lm_SMR <- lm(log10(SMR) ~ log_mass*factor(Temp), data = data)
 
 #check assumptions
 plot(lm_SMR)
