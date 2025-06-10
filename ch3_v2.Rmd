@@ -1,0 +1,967 @@
+---
+title: "Life History Attributes Influencing Metabolic Variation in an Estuarine Fish"
+author: "E. Hoots"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+rm(list=ls())
+
+### read in required packages
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(wesanderson)
+library(readxl)
+library(ggpubr)
+library(grid)
+library(purrr)
+library(lme4)
+library(emmeans)
+library(multcomp)
+library(multcompView)
+library(lsmeans)
+```
+
+## Which came first, the growth-chicken or the metabolism-egg?
+
+My third chapter will explore the influence of energy allocated to growth on the baseline metabolism (standard metabolic rate or SMR) of juvenile fish. SMR is usually measured on fasted, postprandial, resting individuals, although in theoretical best practice it is also measured on a non-reproductive adult individual (no energy allocated to growth). In this study, I aim to study the relative influence of both growth and reproductive development on the baseline metabolism of *Galaxias maculatus*. 
+
+#################################################################
+### Read in data from Hoots et al. (in prep) - hereafter "B1" ###
+#################################################################
+
+```{r}
+
+ds <- read.csv("C:/Users/s222141733/OneDrive - Deakin University/Beth Hoots/Chapter 3/workingtable.csv") # read in data table
+
+month_order <- c("April", "May", "June", "July", "August", "September", "November", "March") # assign chronological order to Month (otherwise alphabetical)
+ds$Month <- factor(ds$Month, levels = month_order) # assign month_order to factor variable "Month" in ds
+
+ds <- ds %>%  
+  arrange(ID_fish, Month) %>%
+  group_by(ID_fish) %>%
+  mutate(mass_prev = lag(mass))
+
+ds1 <- ds[which(ds$Month != "April"),] # subset a new table which excludes April, use if temp treatment matters or if not SGR
+
+month_order <- c("May", "June", "July", "August", "September", "November", "March") # assign chronological order to Month (otherwise alphabetical)
+ds1$Month <- factor(ds1$Month, levels = month_order) # assign month_order to factor variable "Month" in ds1
+
+ds1 <- ds1 %>%
+  arrange(ID_fish, Month) %>%
+  group_by(ID_fish) %>%
+  mutate(SMR_prev = lag(SMR),
+         MMR_prev = lag(MMR)) %>%
+    ungroup() 
+
+
+ds1 <- ds1 %>% 
+  dplyr::mutate(
+    Date = as.Date(time_start)
+  ) %>%
+  dplyr::mutate(ds = "B1",
+                ID = paste("B1",ID_fish, sep = "_"),
+                Temp = as.factor(Temp_class),
+                SMR_mass = NA,
+                SMR_mass_prev = NA,
+                MMR_mass = NA,
+                MMR_mass_prev = NA) %>%
+  dplyr::select(ds, Month, Date, Temp, ID, mass, mass_prev, SGR, SMR, SMR_mass, SMR_resid, SMR_prev, SMR_mass_prev, MMR, MMR_mass, MMR_prev, MMR_mass_prev) 
+```
+
+For this dataset, I also want to make an extra SGR calculation that spans a 2-month interval. This will allow me to make a comparison between "centred" SGR and metabolism later on. 
+
+```{r}
+
+ds1 <- ds1 %>%
+  group_by(ID) %>%
+  mutate(SGR_2m = (log(mass) - lag(log(mass), n = 2)) / as.numeric(difftime(Date, lag(Date, n = 2), units = "days")) * 100) %>%
+  ungroup()
+
+```
+
+We are also interested in merging in some data on maturation in these fish, represented by the ratio between their gut and body cavity depth
+
+```{r}
+#### let's also quickly take a look at those gut ratios 
+B1_gut <- read.csv("C:/Users/s222141733/OneDrive - Deakin University/Beth Hoots/Chapter 2 (2023 Growth Performance)/Analysis/Metadata/Otoliths and biometrics/GutRatio.csv")
+
+# Ensure Temp is correctly assigned
+B1_gut <- B1_gut %>%
+  mutate(
+    Ratio = 100*Ratio,
+    Rack = as.factor(Rack),
+    Date = as.Date(Date, format = "%d/%m/%Y"),
+    Julian = as.numeric(format(Date, "%j")),  # Convert Date to Julian day
+    stage = as.factor(stage),
+    ID = as.character(ID_fish),
+    ID_fish = NULL,
+    Temp = as.factor(case_when(Rack == 1 ~ 18, Rack == 3 ~ 23))
+  ) %>%
+  mutate(ID = paste0("B1_", ID))
+
+```
+
+### Relationship between SGR and mass for dataset B1:
+
+```{r, echo=FALSE}
+
+ggplot(data = ds1, aes(x = mass, y = SGR, color = Temp)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  geom_line(aes(group = ID), alpha = 0.2) +
+  scale_color_manual(values =c("skyblue3","orangered")) +
+  facet_grid(.~Temp) +
+  scale_x_log10() +
+  theme_bw()
+
+```
+This shows us a generally positive trend between SGR and mass, indicating that in general the biggest fish at any time point grew the most. This also shows us that there were no consistent fast or slow growers - rather there is a tangled web of fish jumping around in their growth levels throughout the experiment.
+
+
+### Gut ratio by individual across two measurements in August
+
+```{r}
+ggplot(data=B1_gut, aes(x = Date, y = Ratio, color = Temp)) +
+  geom_line(aes(group = ID), alpha = 0.3) +
+  geom_smooth(aes(group = Temp), method = "lm") +
+  theme_bw() +
+  scale_color_manual(values = c("#78B7C5", "#F21A00")) +
+  labs(color = expression("Temperature ("*degree*C*")"), y = "Gut to Body Depth Ratio (%)")
+```
+
+This figure shows that fish at 23C generally did not mature in August, nor do they seem to have matured in July like the 18C fish did. It would be useful for the 18C fish to have a paired measurement of July SMR with gut ratio, which would help us understand whether a relationship exists between energy allocated to maturation and SMR. 
+
+### Extrapolating measurements of gut ratio to correspond with July SMR measurements for 18C treatment fish only, as 23C fish were not found to have matured.
+
+Using the gut ratio over time relationships established in one of Mike's papers, we determined that a second-order polynomial model would be the best fit for these extrapolations. We start with a global model for each temperature treatment, then extrapolate individual-level values for their respective July respirometry trial dates based on their residuals from that global model.
+
+To start, let's generate a simple linear model to show (over)predicted gut ratio values as a comparison for some extrapolated quadratic model values:
+
+```{r}
+
+# Define July dates
+July <- ds1 %>% 
+  filter(Temp == 18) %>%
+  filter(Month == "July") %>%
+  dplyr::select("Date", "Temp", "ID")
+
+# Fit individual regressions only for fish with at least two data points
+gut_models <- B1_gut %>%
+  group_by(ID) %>%
+  filter(n() > 1) %>%  # Ensure at least two data points per fish
+  summarise(
+    model = list(lm(Ratio ~ Date, data = pick(everything())))
+  ) %>%
+  ungroup()
+
+# Predict values for July
+gut_predictions <- July %>%
+  left_join(gut_models, by = "ID") %>%
+  mutate(
+    Ratio = map2_dbl(model, Date, ~ if (!is.null(.x)) predict(.x, newdata = data.frame(Date = .y)) else NA_real_)
+    ) %>%
+  dplyr::select(ID, Date, Temp, Ratio)
+
+# Combine with original data
+B1_gut_linear <- bind_rows(
+  B1_gut %>% dplyr::select(ID, Date, Temp, Ratio),
+  gut_predictions
+) %>% rename(
+  Ratio_linear = Ratio
+)
+
+B1_gut_linear$ID <- as.character(B1_gut_linear$ID)
+
+# Merge extrapolated data into ds1
+ds1 <- ds1 %>% 
+  left_join(B1_gut_linear %>% dplyr::select("ID", "Date", "Ratio_linear"), by = c("ID", "Date"), na_matches = "na") 
+
+
+```
+
+Let's visualize that now:
+
+```{r}
+
+fig_line <- ggplot(B1_gut_linear[which(B1_gut_linear$"Temp" == 18),], aes(x = Date, y = Ratio_linear, color = Temp)) +
+  geom_hline(yintercept = 74, color = "darkgrey", linewidth = 1, linetype = "dashed") +
+  geom_smooth(aes(group = ID), method = "lm", linewidth = 0.5, se = FALSE) +
+  geom_point(data = B1_gut_linear[which(B1_gut_linear$Temp == 18),], aes(x = Date, y = Ratio_linear, color = Temp), size = 1.5) +
+  geom_point(data = gut_predictions[which(gut_predictions$Temp == 18),], aes(x = Date, y = Ratio), size = 2, shape = 21, fill = "white") +
+  scale_color_manual(values = c("#78B7C5")) +
+  labs(color = expression("Temperature ("*degree*C*")"), y = "Gut to Body Depth Ratio (%)") +
+  theme_bw()
+
+fig_line
+
+```
+
+Now we can get a bit fancier, and try using a more biologically accurate quadratic model: 
+
+```{r}
+
+# # # Fit global poly2 model (for trend)
+global_model <- lm(Ratio ~ poly(Julian, 2), data = B1_gut)
+
+# Get residuals (how each ID deviates from the trend)
+B1_gut <- B1_gut %>%
+  mutate(Residual = Ratio - predict(global_model, newdata = data.frame(Julian = Julian)))
+
+# Extract individual July dates per fish - only in the 18C treatment
+July_dates <- ds1 %>% 
+  filter(Temp == 18) %>%
+  filter(Month == "July") %>%
+  dplyr::select("Date", "Temp", "ID") %>%
+  mutate(
+    Julian = as.numeric(format(Date, "%j")),
+    Global_Pred = predict(global_model, newdata = data.frame(Julian = Julian)),  # Global trend
+    ID = as.character(ID))
+
+# Adjust for individual residuals based on their own July date
+gut_predictions <- B1_gut %>%
+  filter(Temp == 18) %>%
+  group_by(ID) %>%
+  summarise(Mean_Residual = mean(Residual, na.rm = TRUE), Temp = first(Temp)) %>%
+  ungroup() %>%
+  left_join(July_dates, by = c("ID", "Temp")) %>%
+  mutate(
+    Ratio = Global_Pred + Mean_Residual  # Adjusted extrapolation for each fish's date
+  ) %>%
+  dplyr::select(ID, Date, Julian, Temp, Ratio)
+
+# Combine observed data & adjusted extrapolated points
+B1_gut_extrap <- bind_rows(
+  B1_gut %>% mutate(ID = as.character(ID)) %>% dplyr::select(ID, Date, Temp, Ratio),
+  gut_predictions
+) %>%
+  mutate(Julian = as.numeric(format(Date, "%j")))
+
+B1_gut_extrap$ID <- as.character(B1_gut_extrap$ID)
+
+# Merge extrapolated data into ds1
+ds1 <- ds1 %>% 
+  left_join(B1_gut_extrap %>% dplyr::select("ID", "Date", "Ratio"), by = c("ID", "Date"), na_matches = "na") 
+
+```
+
+Let's visualize that:
+
+```{r, echo=FALSE}
+# Plot updated results
+fig_quad <- ggplot(B1_gut_extrap[which(B1_gut_extrap$Temp == 18),], aes(x = Date, y = Ratio, color = Temp)) +
+  geom_hline(yintercept = 74, color = "darkgrey", linewidth = 1, linetype = "dashed") +
+  
+  # Individual smooth curves (won't be perfect poly2 but close)
+  geom_smooth(aes(group = ID), method = "lm", formula = y ~ poly(x, 2), linewidth = 0.5, se = FALSE) +
+  
+  # Observed points + Individually extrapolated July points
+  geom_point(data = B1_gut[which(B1_gut$Temp == 18),], aes(x = Date, y = Ratio, color = Temp), size = 1.5) +
+  geom_point(data = gut_predictions, aes(x = Date, y = Ratio), size = 2, shape = 21, fill = "white") +
+  
+  scale_color_manual(values = c("#78B7C5")) +
+  labs(color = expression("Temperature ("*degree*C*")"), y = "Gut to Body Depth Ratio (%)") +
+  theme_bw()
+
+```
+
+We have now extrapolated individual-level estimates for gut-to-body-depth ratio at the July respirometry trial dates, using each fish's residuals from a global 2nd-order polynomial model. This follows the relationship found in Mike's study, as well as the timing of maturation and re-absorption of reproductive tissues - although this seems to have occurred on an accelerated timeline in these fish compared to Mike's study. These values do not differ greatly from what was seen using linear models to extrapolate, however the linear model predicted biologically unlikely gut ratio values near 100%, while this model does not.
+
+```{r}
+# merge extrapolated data into ds1
+ds1 <- ds1 %>% 
+  left_join(B1_gut_extrap %>% dplyr::select("ID", "Date", "Ratio"), by = c("ID", "Date"), na_matches = "na") %>% 
+  left_join(B1_gut_linear %>% dplyr::select("ID", "Date", "Ratio_linear"), by = c("ID", "Date"), na_matches = "na") %>% 
+  mutate(Date = NULL,
+         Ratio = Ratio.x,
+         Ratio_linear = Ratio_linear.x,
+         Ratio.y = NULL,
+         Ratio_linear.y = NULL,
+         log_SMR = log10(SMR),
+         log_MMR = log10(MMR),
+         log_mass = log10(mass)) %>%
+  dplyr::select(ds, Month, Temp, ID, mass, mass_prev, SGR, SGR_2m, SMR, SMR_mass, SMR_resid, SMR_prev, SMR_mass_prev, MMR, MMR_mass, MMR_prev, MMR_mass_prev, Ratio, Ratio_linear, log_SMR, log_MMR, log_mass)
+
+```
+
+#############################################################
+### read in data from Hoots et al., 2024 - hereafter "B2" ###
+#############################################################
+
+```{r}
+ds2 <- read.csv("C:/Users/s222141733/OneDrive - Deakin University/Beth Hoots/Chapter 1 (growth performance pilot)/Results/Processed/Ch3_ds2.csv")
+
+ds2<- ds2 %>%
+  dplyr::mutate(
+    ds = "B2",
+    Month = as.factor(Month),
+    Temp = as.factor(Temp),
+    mass_prev = NA,
+    SGR_2m = NA,
+    ID = paste("B2",ID, sep = "_"),
+    mass_SMR = SMR_mass,
+    SMR_resid = NA,
+    SMR_mass = NA,
+    SMR_mass_prev = NA,
+    MMR_mass = NA,
+    MMR_mass_prev = NA,
+    log_SMR = log10(SMR),
+    log_MMR = log10(MMR),
+    log_mass = log10(mass),
+    Ratio = NA,
+    Ratio_linear = NA
+  ) %>% 
+  arrange(ID, Month) %>%
+  group_by(ID) %>%
+  mutate(mass_prev = lag(mass)) %>%
+  ungroup() %>%
+  dplyr::select(ds, Month, Temp, ID, mass, mass_prev, SGR, SGR_2m, SMR, SMR_mass, SMR_resid, SMR_prev, SMR_mass_prev, MMR, MMR_mass, MMR_prev, MMR_mass_prev, Ratio, Ratio_linear, log_SMR, log_MMR, log_mass)
+
+```
+
+##############################################################
+### read in data from Skeeles et al., 2024 - hereafter "M" ###
+##############################################################
+
+```{r}
+
+ds3 <- read_excel("C:/Users/s222141733/OneDrive - Deakin University/Beth Hoots/Chapter 2 (2023 Growth Performance)/Analysis/Mike datasets/stomach_size_vs_gonad_mass.xlsx", sheet = "Beth Normoxia Only")
+
+ds3 <- ds3 %>%
+  dplyr::mutate(
+    ds = "M",
+    Month = "June",
+    Temp = as.factor(temperature),
+    ID = as.character(paste0("M", row_number())),
+    #ID = paste("M", id, sep = "_"),
+    mass = `average of 1st and 2nd mass (g)`,
+    mass_prev = NA,
+    SGR = NA,
+    SGR_2m = NA,
+    SMR = SMRnorm,
+    SMR_mass = NA,
+    SMR_resid = NA,
+    SMR_prev = NA,
+    SMR_mass_prev = NA, 
+    MMR = MMRnorm,
+    MMR_mass = NA,
+    MMR_prev = NA,
+    MMR_mass_prev = NA,
+    Ratio = `gutwidth/totalwidth`,
+    Ratio_linear = `gutwidth/totalwidth`,
+    log_SMR = log10(SMRnorm),
+    log_MMR = log10(MMRnorm),
+    log_mass = log10(`average of 1st and 2nd mass (g)`)
+  ) %>% 
+  arrange(ID, Month) %>%
+  group_by(ID) %>%
+  mutate(mass_prev = lag(mass)) %>%
+  ungroup() %>%
+ dplyr::select(ds, Month, Temp, ID, mass, mass_prev, SGR, SGR_2m, SMR, SMR_mass, SMR_resid, SMR_prev, SMR_mass_prev, MMR, MMR_mass, MMR_prev, MMR_mass_prev, Ratio, Ratio_linear, log_SMR, log_MMR, log_mass)
+
+```
+
+#################################################
+### merge 3 datasets into single master table ###
+#################################################
+
+```{r}
+data <- bind_rows(ds1, ds2, ds3)
+
+temp_order <- c(15, 18, 20, 23) # assign chronological order to Temp (otherwise alphabetical)
+data$Temp <- factor(data$Temp, levels = temp_order) # assign temp_order to factor variable "Temp" in ds1
+data$Month <- factor(data$Month, levels = month_order) # assign month_order to factor variable "Month" in ds1
+
+```
+
+###################################################
+### mass-standardize all SMR to grand mean mass ###
+###################################################
+
+```{r}
+
+lm_15_SMR <- lm(log_SMR ~ log_mass, data = data[which(data$Temp == 15),])
+plot(lm_15_SMR)
+summary(lm_15_SMR)
+
+lm_18a_SMR <- lm(log_SMR ~ log_mass, data = data[which(data$ds == "B1" & data$Temp == 18),])
+plot(lm_18a_SMR)
+summary(lm_18a_SMR)
+
+lm_18b_SMR <- lm(log_SMR ~ log_mass, data = data[which(data$ds == "B2"),])
+plot(lm_18b_SMR)
+summary(lm_18b_SMR)
+
+lm_20_SMR <- lm(log_SMR ~ log_mass, data = data[which(data$Temp == 20),])
+plot(lm_20_SMR)
+summary(lm_20_SMR)
+
+lm_23_SMR <- lm(log_SMR ~ log_mass, data = data[which(data$Temp == 23),])
+plot(lm_23_SMR)
+summary(lm_23_SMR)
+
+log_mass_grandmean = data.frame(log_mass = log10(mean(data$mass))) #grand mean mass is 3.47 g
+
+SMR_mean_predicted_15 = predict(lm_15_SMR, newdata = log_mass_grandmean) 
+SMR_mean_predicted_18a = predict(lm_18a_SMR, newdata = log_mass_grandmean)
+SMR_mean_predicted_18b = predict(lm_18b_SMR, newdata = log_mass_grandmean) 
+SMR_mean_predicted_20 = predict(lm_20_SMR, newdata = log_mass_grandmean) 
+SMR_mean_predicted_23 = predict(lm_23_SMR, newdata = log_mass_grandmean) 
+
+data <- data %>% mutate(resid = NA)
+
+#adding the residuals calculated from our regressions to our table
+data[which(data$Temp == 15),] <- data[which(data$Temp == 15),] %>%
+  mutate(resid = residuals(lm_15_SMR))
+
+data[which(data$ds == "B1" & data$Temp == 18),] <- data[which(data$ds == "B1" & data$Temp == 18),] %>%
+  mutate(resid = residuals(lm_18a_SMR))
+
+data[which(data$ds == "B2"),] <- data[which(data$ds == "B2"),] %>%
+  mutate(resid = residuals(lm_18b_SMR))
+
+data[which(data$Temp == 20),] <- data[which(data$Temp == 20),] %>%
+  mutate(resid = residuals(lm_20_SMR))
+
+data[which(data$Temp == 23),] <- data[which(data$Temp == 23),] %>%
+  mutate(resid = residuals(lm_23_SMR))
+
+
+data$log_SMR_mass[data$Temp == 15] <-
+  SMR_mean_predicted_15 + data$resid[data$Temp == 15]
+
+data$log_SMR_mass[data$ds == "B1" & data$Temp == 18] <-
+  SMR_mean_predicted_18a + data$resid[data$ds == "B1" & data$Temp == 18]
+
+data$log_SMR_mass[data$ds == "B2"] <-
+  SMR_mean_predicted_18b + data$resid[data$ds == "B2"]
+
+data$log_SMR_mass[data$Temp == 20] <-
+  SMR_mean_predicted_20 + data$resid[data$Temp == 20]
+
+data$log_SMR_mass[data$Temp == 23] <-
+  SMR_mean_predicted_23 + data$resid[data$Temp == 23]
+
+
+data <- data %>% 
+  mutate(
+    SMR_mass = as.numeric(10^log_SMR_mass)
+  ) %>%
+  dplyr::select( -log_SMR_mass, -log_SMR, -resid)  # Clean up unnecessary columns 
+
+data <- data %>%
+  arrange(ID, Month) %>%
+  group_by(ID) %>%
+  mutate(SMR_mass_prev = lag(SMR_mass)) %>%
+  ungroup()
+
+#write.csv(data, file = "ch3datamerge.csv", col.names = TRUE, row.names = FALSE) 
+
+```
+
+
+###################################################
+### mass-standardize all MMR to grand mean mass ###
+###################################################
+
+```{r}
+
+lm_15 <- lm(log_MMR ~ log_mass, data = data[which(data$Temp == 15),])
+lm_18a <- lm(log_MMR ~ log_mass, data = data[which(data$ds == "B1" & data$Temp == 18),])
+lm_18b <- lm(log_MMR ~ log_mass, data = data[which(data$ds == "B2"),])
+lm_20 <- lm(log_MMR ~ log_mass, data = data[which(data$Temp == 20),])
+lm_23 <- lm(log_MMR ~ log_mass, data = data[which(data$Temp == 23),])
+
+MMR_mean_predicted_15 = predict(lm_15, newdata = log_mass_grandmean) 
+MMR_mean_predicted_18a = predict(lm_18a, newdata = log_mass_grandmean)
+MMR_mean_predicted_18b = predict(lm_18b, newdata = log_mass_grandmean) 
+MMR_mean_predicted_20 = predict(lm_20, newdata = log_mass_grandmean) 
+MMR_mean_predicted_23 = predict(lm_23, newdata = log_mass_grandmean) 
+
+data <- data %>% mutate(resid = NA)
+
+#adding the residuals calculated from our regressions to our table
+data[which(data$Temp == 15),] <- data[which(data$Temp == 15),] %>%
+  mutate(resid = residuals(lm_15))
+
+data[which(data$ds == "B1" & data$Temp == 18),] <- data[which(data$ds == "B1" & data$Temp == 18),] %>%
+  mutate(resid = residuals(lm_18a))
+
+data[which(data$ds == "B2"),] <- data[which(data$ds == "B2"),] %>%
+  mutate(resid = residuals(lm_18b))
+
+data[which(data$Temp == 20),] <- data[which(data$Temp == 20),] %>%
+  mutate(resid = residuals(lm_20))
+
+data[which(data$Temp == 23),] <- data[which(data$Temp == 23),] %>%
+  mutate(resid = residuals(lm_23))
+
+data <- data %>% mutate(log_MMR_mass = NA)
+
+data$log_MMR_mass[data$Temp == 15] <-
+  MMR_mean_predicted_15 + data$resid[data$Temp == 15]
+
+data$log_MMR_mass[data$ds == "B1" & data$Temp == 18] <-
+  MMR_mean_predicted_18a + data$resid[data$ds == "B1" & data$Temp == 18]
+
+data$log_MMR_mass[data$ds == "B2"] <-
+  MMR_mean_predicted_18b + data$resid[data$ds == "B2"]
+
+data$log_MMR_mass[data$Temp == 20] <-
+  MMR_mean_predicted_20 + data$resid[data$Temp == 20]
+
+data$log_MMR_mass[data$Temp == 23] <-
+  MMR_mean_predicted_23 + data$resid[data$Temp == 23]
+
+
+data <- data %>% 
+  mutate(
+    MMR_mass = as.numeric(10^log_MMR_mass)
+  ) %>%
+  dplyr::select( -log_MMR_mass, -log_MMR, -resid)  # Clean up unnecessary columns 
+
+data <- data %>%
+  arrange(ID, Month) %>%
+  group_by(ID) %>%
+  mutate(MMR_mass_prev = lag(MMR_mass)) %>%
+  ungroup()
+
+```
+
+#####################
+### data analysis ###
+#####################
+
+#### Linear regression through SGR and SMR, by temp and time interval
+
+First, we are interested to understand whether SMR is influenced by growth rate. We start by making sure that our growth (SGR) data are mass-standardized:
+
+```{r, echo = F}
+ggplot(data = data[which(data$Temp == 18 | data$Temp == 23),], aes(x = mass, y = lead(SGR_2m), colour = factor(Temp), fill = factor(Temp))) +
+  geom_point(size = 2) +
+  geom_smooth(method = "lm", se = T) +
+  scale_color_manual(values =c("skyblue", "orangered"),
+    guide = guide_legend(override.aes = list(size = 4))) +
+  scale_fill_manual(values =c("skyblue", "orangered"), guide = "none") +
+  labs(y = "Specific Growth Rate (% mass/day)", x = "mass (g)", color = expression("Temperature ("*degree*C*")")) +
+  scale_x_log10() +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.background = element_rect(fill = "black", color = NA),
+    panel.background = element_rect(fill = "black", color = NA),
+    panel.grid = element_blank(),
+    legend.background = element_rect(fill = "black"),
+    legend.key = element_rect(fill = "black"),
+    legend.text = element_text(color = "white"),
+    legend.title = element_text(color = "white"),
+    axis.title = element_text(color = "white"),
+    axis.text = element_text(color = "white"),
+    axis.line = element_line(color = "white"),
+    strip.background = element_rect(fill = "black"),
+    strip.text = element_text(color = "white")
+  )
+```
+
+With only a visual inspection, it looks like SGR is already pretty well standardized to the intermediate mass measurement when SGR is taken from a two month interval.
+
+Now we move on to look at the relationship between SGR and mass-standardized SMR.
+
+```{r, echo = F}
+
+ggplot(data[which(data$ds == "B1"),], aes(x = lead(SGR_2m), y = SMR_mass, colour = factor(Temp), fill = factor(Temp))) +
+  geom_point(size = 2) +
+  geom_smooth(method = "lm", se = T, aes(fill = factor(Temp))) +
+  scale_color_manual(values =c("skyblue", "orangered"),
+    guide = guide_legend(override.aes = list(size = 4))) +
+  scale_fill_manual(values =c("skyblue", "orangered"), guide = "none") +
+  labs(x = "Specific Growth Rate (%mass/day)", y = expression(SMR~(mg~O[2]~hr^-1~3.47~g^-1)), color = expression("Temperature ("*degree*C*")")) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.background = element_rect(fill = "black", color = NA),
+    panel.background = element_rect(fill = "black", color = NA),
+    panel.grid = element_blank(),
+    legend.background = element_rect(fill = "black"),
+    legend.key = element_rect(fill = "black"),
+    legend.text = element_text(color = "white"),
+    legend.title = element_text(color = "white"),
+    axis.title = element_text(color = "white"),
+    axis.text = element_text(color = "white"),
+    axis.line = element_line(color = "white"),
+    strip.background = element_rect(fill = "black"),
+    strip.text = element_text(color = "white")
+  )
+
+
+ggplot(data[which(data$ds == "B1"),], aes(x = mass, y = SMR_mass, colour = factor(Temp), fill = factor(Temp))) +
+  geom_point(size = 2) +
+  geom_smooth(method = "lm", se = T, aes(fill = factor(Temp))) +
+  scale_color_manual(values =c("skyblue", "orangered"),
+    guide = guide_legend(override.aes = list(size = 4))
+  ) +
+  scale_x_log10() +
+  scale_fill_manual(values =c("skyblue", "orangered"), guide = "none") +
+  labs(x = "mass (g)", y = expression(SMR~(mg~O[2]~hr^-1~3.47~g^-1)), color = expression("Temperature ("*degree*C*")")) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.background = element_rect(fill = "black", color = NA),
+    panel.background = element_rect(fill = "black", color = NA),
+    panel.grid = element_blank(),
+    legend.background = element_rect(fill = "black"),
+    legend.key = element_rect(fill = "black"),
+    legend.text = element_text(color = "white"),
+    legend.title = element_text(color = "white"),
+    axis.title = element_text(color = "white"),
+    axis.text = element_text(color = "white"),
+    axis.line = element_line(color = "white"),
+    strip.background = element_rect(fill = "black"),
+    strip.text = element_text(color = "white")
+  )
+
+
+dataB1 <- data[which(data$ds == "B1"),]
+dataB1$SGR_2m_lead <- lead(dataB1$SGR_2m)
+
+lm_sgr_smr18 <- lm(SMR_mass ~ SGR_2m_lead, dataB1[which(dataB1$Temp == 18),])
+plot(lm_sgr_smr18)
+hist(lm_sgr_smr18$residuals)
+summary(lm_sgr_smr18)
+
+lm_sgr_smr23 <- lm(SMR_mass ~ SGR_2m_lead, dataB1[which(dataB1$Temp == 23),])
+plot(lm_sgr_smr23)
+hist(lm_sgr_smr23$residuals)
+summary(lm_sgr_smr23)
+
+
+
+ggplot(data[which(data$ds == "B1"),], aes(x = lead(SGR_2m), y = SMR_mass, colour = factor(Temp), fill = factor(Temp))) +
+  geom_point() +
+  geom_smooth(method = "lm", se = T, aes(fill = factor(Temp))) +
+  theme_bw() +
+  scale_color_manual(values =c("skyblue3", "orangered")) +
+  scale_fill_manual(values =c("skyblue3", "orangered"), guide = "none") +
+  facet_grid(.~Month) +
+  labs(x = "SGR", y = expression(SMR~(mg~O[2]~hr^-1~3.47~g^-1)), color = expression("Temperature ("*degree*C*")")) 
+
+#fig for SEB
+
+ggplot(data[which(data$ds == "B1"),], aes(x = lead(SGR_2m), y = SMR_mass, colour = factor(Temp), fill = factor(Temp))) +
+  geom_point(size = 2) +
+  geom_smooth(method = "lm", se = T, aes(fill = factor(Temp))) +
+  facet_grid(.~Month, scales = "free_x") +
+  scale_color_manual(values =c("skyblue", "orangered"),
+    guide = guide_legend(override.aes = list(size = 4))) +
+  scale_fill_manual(values =c("skyblue", "orangered"), guide = "none") +
+  labs(x = "Specific Growth Rate (%mass/day)", y = expression(SMR~(mg~O[2]~hr^-1~3.47~g^-1)), color = expression("Temperature ("*degree*C*")")) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.background = element_rect(fill = "black", color = NA),
+    panel.background = element_rect(fill = "black", color = NA),
+    panel.grid = element_blank(),
+    legend.background = element_rect(fill = "black"),
+    legend.key = element_rect(fill = "black"),
+    legend.text = element_text(color = "white"),
+    legend.title = element_text(color = "white"),
+    axis.title = element_text(color = "white"),
+    axis.text = element_text(color = "white"),
+    axis.line = element_line(color = "white"),
+    strip.background = element_rect(fill = "black"),
+    strip.text = element_text(color = "white")
+  )
+
+lm_sgr_smr_month <- lm(SMR_mass ~ lead(SGR_2m)*factor(Temp)*Month, dataB1)
+summary(lm_sgr_smr_month)
+anova(lm_sgr_smr_month)
+
+ggplot(data[which(data$ds == "B1"),], aes(x = lead(SGR_2m), y = MMR_mass, colour = factor(Temp), fill = factor(Temp))) +
+  geom_point() +
+  geom_smooth(method = "lm", se = T, aes(fill = factor(Temp))) +
+  theme_bw() +
+  scale_color_manual(values =c("skyblue3", "orangered")) +
+  scale_fill_manual(values =c("skyblue3", "orangered"), guide = "none") +
+  labs(x = "SGR", y = expression(MMR~(mg~O[2]~hr^-1~3.47~g^-1)), color = expression("Temperature ("*degree*C*")")) 
+
+ggplot(data[which(data$ds == "B1"),], aes(x = lead(SGR_2m), y = MMR_mass, colour = factor(Temp), fill = factor(Temp))) +
+  geom_point(size = 2) +
+  geom_smooth(method = "lm", se = T, aes(fill = factor(Temp))) +
+  scale_color_manual(values =c("skyblue", "orangered"),
+    guide = guide_legend(override.aes = list(size = 4))) +
+  scale_fill_manual(values =c("skyblue", "orangered"), guide = "none") +
+  labs(x = "Specific Growth Rate (%mass/day)", y = expression(MMR~(mg~O[2]~hr^-1~3.47~g^-1)), color = expression("Temperature ("*degree*C*")")) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.background = element_rect(fill = "black", color = NA),
+    panel.background = element_rect(fill = "black", color = NA),
+    panel.grid = element_blank(),
+    legend.background = element_rect(fill = "black"),
+    legend.key = element_rect(fill = "black"),
+    legend.text = element_text(color = "white"),
+    legend.title = element_text(color = "white"),
+    axis.title = element_text(color = "white"),
+    axis.text = element_text(color = "white"),
+    axis.line = element_line(color = "white"),
+    strip.background = element_rect(fill = "black"),
+    strip.text = element_text(color = "white")
+  )
+
+
+ggplot(data[which(data$ds == "B1"),], aes(x = lead(SGR_2m), y = MMR_mass, colour = factor(Temp), fill = factor(Temp))) +
+  geom_point() +
+  geom_smooth(method = "lm", se = T, aes(fill = factor(Temp))) +
+  theme_bw() +
+  scale_color_manual(values =c("skyblue3", "orangered")) +
+  scale_fill_manual(values =c("skyblue3", "orangered"), guide = "none") +
+  facet_grid(.~Month) +
+  labs(x = "SGR", y = expression(MMR~(mg~O[2]~hr^-1~3.47~g^-1)), color = expression("Temperature ("*degree*C*")")) 
+
+#fig for SEB
+
+ggplot(data[which(data$ds == "B1"),], aes(x = lead(SGR_2m), y = MMR_mass, colour = factor(Temp), fill = factor(Temp))) +
+  geom_point(size = 2) +
+  geom_smooth(method = "lm", se = T, aes(fill = factor(Temp))) +
+  facet_grid(.~Month, scales = "free_x") +
+  scale_color_manual(values =c("skyblue", "orangered"),
+    guide = guide_legend(override.aes = list(size = 4))) +
+  scale_fill_manual(values =c("skyblue", "orangered"), guide = "none") +
+  labs(x = "Specific Growth Rate (%mass/day)", y = expression(MMR~(mg~O[2]~hr^-1~3.47~g^-1)), color = expression("Temperature ("*degree*C*")")) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.background = element_rect(fill = "black", color = NA),
+    panel.background = element_rect(fill = "black", color = NA),
+    panel.grid = element_blank(),
+    legend.background = element_rect(fill = "black"),
+    legend.key = element_rect(fill = "black"),
+    legend.text = element_text(color = "white"),
+    legend.title = element_text(color = "white"),
+    axis.title = element_text(color = "white"),
+    axis.text = element_text(color = "white"),
+    axis.line = element_line(color = "white"),
+    strip.background = element_rect(fill = "black"),
+    strip.text = element_text(color = "white")
+  )
+
+lm_sgr_mmr18 <- lm(MMR_mass ~ SGR_2m_lead, dataB1[which(dataB1$Temp == 18),])
+plot(lm_sgr_mmr18)
+hist(lm_sgr_mmr18$residuals)
+summary(lm_sgr_mmr18)
+
+lm_sgr_mmr23 <- lm(MMR_mass ~ SGR_2m_lead, dataB1[which(dataB1$Temp == 23),])
+plot(lm_sgr_mmr23)
+hist(lm_sgr_mmr23$residuals)
+summary(lm_sgr_mmr23)
+
+lm_sgr_mmr_month <- lm(MMR_mass ~ lead(SGR_2m)*factor(Temp)*Month, dataB1)
+summary(lm_sgr_mmr_month)
+anova(lm_sgr_mmr_month)
+
+```
+
+
+```{r, echo = F}
+# plot gut ratio vs. mass-standardized SMR, indicate extrapolated values:
+ggplot() +
+  geom_vline(xintercept = 74, color = "grey", linetype = "dashed", linewidth = 1.5) +
+  geom_point(data = data, aes(x = Ratio, y = SMR_mass, color = factor(Temp)), size = 2) +
+  geom_point(data = data[which(data$Month == "July"),], aes(x = Ratio, y = SMR_mass, color = factor(Temp)), shape = 21, fill = "black") +
+  geom_smooth(data = data, aes(x = Ratio, y = SMR_mass, color = factor(Temp)), method = "lm", se = F) +
+  scale_color_manual(values =c("deepskyblue3", "skyblue", "orange", "orangered"),
+    guide = guide_legend(override.aes = list(size = 4))) +
+  labs(x = "Gut Ratio (%)", y = expression(SMR~(mg~O[2]~hr^-1~3.47~g^-1)), color = "Temperature") +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.background = element_rect(fill = "black", color = NA),
+    panel.background = element_rect(fill = "black", color = NA),
+    panel.grid = element_blank(),
+    legend.background = element_rect(fill = "black"),
+    legend.key = element_rect(fill = "black"),
+    legend.text = element_text(color = "white"),
+    legend.title = element_text(color = "white"),
+    axis.title = element_text(color = "white"),
+    axis.text = element_text(color = "white"),
+    axis.line = element_line(color = "white"),
+    strip.background = element_rect(fill = "black"),
+    strip.text = element_text(color = "white")
+  )
+
+
+
+
+# gut ratio vs. mass-standardized SMR but using linearly extrapolated gut ratio values:
+ggplot() +
+  geom_vline(xintercept = 74, color = "grey", linetype = "dashed", size = 1.5) +
+  geom_point(data = data, aes(x = Ratio_linear, y = SMR_mass, color = factor(Temp))) +
+  geom_point(data = data[which(data$Month == "July"),], aes(x = Ratio_linear, y = SMR_mass, color = factor(Temp)), shape = 21, fill = "white") +
+  geom_smooth(data = data, aes(x = Ratio_linear, y = SMR_mass, color = factor(Temp)), method = "lm", se = F) +
+  theme_bw() +
+  scale_color_manual(values =c("darkblue", "skyblue3", "orange", "orangered")) +
+  labs(x = "Gut Ratio (%)", y = expression(SMR~(mg~O[2]~hr^-1~3.47~g^-1)), color = "Temperature")
+
+```
+```{r}
+# plot gut ratio vs. mass-standardized MMR, indicate extrapolated values:
+ggplot() +
+  geom_vline(xintercept = 74, color = "grey", linetype = "dashed", linewidth = 1.5) +
+  geom_point(data = data, aes(x = Ratio, y = MMR_mass, color = factor(Temp)), size = 2) +
+  geom_point(data = data[which(data$Month == "July"),], aes(x = Ratio, y = MMR_mass, color = factor(Temp)), shape = 21, fill = "black") +
+  geom_smooth(data = data, aes(x = Ratio, y = MMR_mass, color = factor(Temp)), method = "lm", se = F) +
+  scale_color_manual(values =c("deepskyblue3", "skyblue", "orange", "orangered"),
+    guide = guide_legend(override.aes = list(size = 4))) +
+  labs(x = "Gut Ratio (%)", y = expression(MMR~(mg~O[2]~hr^-1~3.47~g^-1)), color = "Temperature") +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.background = element_rect(fill = "black", color = NA),
+    panel.background = element_rect(fill = "black", color = NA),
+    panel.grid = element_blank(),
+    legend.background = element_rect(fill = "black"),
+    legend.key = element_rect(fill = "black"),
+    legend.text = element_text(color = "white"),
+    legend.title = element_text(color = "white"),
+    axis.title = element_text(color = "white"),
+    axis.text = element_text(color = "white"),
+    axis.line = element_line(color = "white"),
+    strip.background = element_rect(fill = "black"),
+    strip.text = element_text(color = "white")
+  )
+
+# gut ratio vs. mass-standardized MMR but using linearly extrapolated gut ratio values:
+ggplot() +
+  geom_vline(xintercept = 74, color = "grey", linetype = "dashed", size = 1.5) +
+  geom_point(data = data, aes(x = Ratio_linear, y = MMR_mass, color = factor(Temp))) +
+  geom_point(data = data[which(data$Month == "July"),], aes(x = Ratio_linear, y = MMR_mass, color = factor(Temp)), shape = 21, fill = "white") +
+  geom_smooth(data = data, aes(x = Ratio_linear, y = MMR_mass, color = factor(Temp)), method = "lm", se = F) +
+  theme_bw() +
+  scale_color_manual(values =c("darkblue", "skyblue3", "orange", "orangered")) +
+  labs(x = "Gut Ratio (%)", y = expression(MMR~(mg~O[2]~hr^-1~3.47~g^-1)), color = "Temperature")
+
+```
+
+Gut ratio really does not seem to have any correlation with mass-standardized SMR (any correlation seen between gut ratio and SMR could be explained by mass). Note that this figure uses the previously extrapolated values (above). For MMR, the case is a bit more complicated, as there seems to be a positive relationship between
+
+```{r, echo = F}
+ggplot(data = data, aes(x = mass, y = SMR, color = factor(Temp))) +
+  geom_point() +
+  geom_smooth(method = "lm", se = F) +
+  theme_bw() +
+  scale_color_manual(values =c("darkblue", "skyblue3", "orange", "orangered")) +
+  labs(x = "Mass (g)", y = expression(SMR~(mg~O[2]~hr^-1)), color = "Temperature") +
+  scale_x_log10() +
+  scale_y_log10()
+
+#plot with dark theme for SEB Talk:
+ggplot(data = data, aes(x = mass, y = SMR, color = factor(Temp))) +
+  geom_point(size = 2) +
+  geom_smooth(method = "lm", se = FALSE, linewidth = 1) +
+  scale_color_manual(
+    values = c("deepskyblue3", "skyblue", "orange", "orangered"),
+    guide = guide_legend(override.aes = list(size = 4))
+  ) +
+  labs(
+    x = "Mass (g)",
+    y = expression(SMR~(mg~O[2]~hr^-1)),
+    color = "Temperature"
+  ) +
+  scale_x_log10() +
+  scale_y_log10() +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.background = element_rect(fill = "black", color = NA),
+    panel.background = element_rect(fill = "black", color = NA),
+    panel.grid = element_blank(),
+    legend.background = element_rect(fill = "black"),
+    legend.key = element_rect(fill = "black"),
+    legend.text = element_text(color = "white"),
+    legend.title = element_text(color = "white"),
+    axis.title = element_text(color = "white"),
+    axis.text = element_text(color = "white"),
+    axis.line = element_line(color = "white"),
+    strip.background = element_rect(fill = "black"),
+    strip.text = element_text(color = "white")
+  )
+
+
+lm_SMR <- lmer(log10(SMR) ~ log_mass*factor(Temp), data = data)
+
+#check assumptions
+plot(lm_SMR)
+hist(lm_SMR$residuals)
+summary(lm_SMR)
+
+#compare slopes of metabolism-mass scaling at different temperatures
+lm_SMR.compare <- emmeans::lstrends(lm_SMR, ~ Temp, var = "log_mass")
+
+lm_SMR.slope <- cld(lm_SMR.compare)
+lm_SMR.slope
+
+#now compare intercepts (at grand mean mass, not log_mass = 0) of metabolism-mass scaling at different temperatures
+lm_SMR.int.compare <- emmeans(lm_SMR, ~Temp, at = list(log_mass = log10(mean(data$mass))))
+
+lm_SMR.int <- cld(lm_SMR.int.compare)
+lm_SMR.int
+```
+
+Finally, we see a narrowing-in when we plot SMR vs. mass for our four temperatures. While mass-scaling intercepts tend to increase with temperature, slopes seem to decrease. This creates an effect where, for the largest fish, there is not a visible difference in SMR by temperature treatment - they have converged to what may be a mass-imposed metabolic floor.
+
+```{r}
+
+ggplot(data = data, aes(x = mass, y = MMR, color = factor(Temp))) +
+  geom_point() +
+  geom_smooth(method = "lm", se = F) +
+  theme_bw() +
+  scale_color_manual(values =c("darkblue", "skyblue3", "orange", "orangered")) +
+  labs(x = "Mass (g)", y = expression(MMR~(mg~O[2]~hr^-1)), color = "Temperature") +
+  scale_x_log10() +
+  scale_y_log10()
+
+#plot with dark theme for SEB Talk:
+ggplot(data = data, aes(x = mass, y = MMR, color = factor(Temp))) +
+  geom_point(size = 2) +
+  geom_smooth(method = "lm", se = FALSE, linewidth = 1) +
+  scale_color_manual(
+    values = c("deepskyblue3", "skyblue", "orange", "orangered"),
+    guide = guide_legend(override.aes = list(size = 4))
+  ) +
+  labs(
+    x = "Mass (g)",
+    y = expression(MMR~(mg~O[2]~hr^-1)),
+    color = "Temperature"
+  ) +
+  scale_x_log10() +
+  scale_y_log10() +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.background = element_rect(fill = "black", color = NA),
+    panel.background = element_rect(fill = "black", color = NA),
+    panel.grid = element_blank(),
+    legend.background = element_rect(fill = "black"),
+    legend.key = element_rect(fill = "black"),
+    legend.text = element_text(color = "white"),
+    legend.title = element_text(color = "white"),
+    axis.title = element_text(color = "white"),
+    axis.text = element_text(color = "white"),
+    axis.line = element_line(color = "white"),
+    strip.background = element_rect(fill = "black"),
+    strip.text = element_text(color = "white")
+  )
+
+lm_MMR <- lm(log10(MMR) ~ log_mass*factor(Temp), data = data)
+
+#check assumptions
+plot(lm_MMR)
+hist(lm_MMR$residuals)
+summary(lm_MMR)
+
+#compare slopes of metabolism-mass scaling at different temperatures
+lm_MMR.compare <- emmeans::lstrends(lm_MMR, ~ Temp, var = "log_mass")
+
+lm_MMR.slope <- cld(lm_MMR.compare)
+lm_MMR.slope
+#now compare intercepts (at grand mean mass, not log_mass = 0) of metabolism-mass scaling at different temperatures
+lm_MMR.int.compare <- emmeans(lm_MMR, ~Temp, at = list(log_mass = log10(mean(data$mass))))
+
+lm_MMR.int <- cld(lm_MMR.int.compare)
+lm_MMR.int
+```
+
