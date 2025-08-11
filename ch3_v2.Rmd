@@ -42,9 +42,9 @@ My third chapter will explore the influence of energy allocated to growth on the
 
 Elizabeth C. Hoots
 
-Email: beth.hoots@research.deakin.edu.au
+Email: ehoots.research@gmail.com
 
-GitHub: https://github.com/Bhoots99
+GitHub: https://github.com/E-Hoots-Research
 
 Web: https://elizabeth-hoots.owlstown.net/
 
@@ -199,11 +199,13 @@ This shows us a generally positive trend between SGR and mass, indicating that i
 
 ```{r}
 ggplot(data=B1_gut, aes(x = Date, y = Ratio, color = Temp)) +
+  geom_hline(yintercept = 74, linetype = "dashed", color = "black") +
   geom_line(aes(group = ID), alpha = 0.3) +
   geom_smooth(aes(group = Temp), method = "lm") +
   theme_bw() +
   scale_color_manual(values = c("#78B7C5", "#F21A00")) +
-  labs(color = expression("Temperature ("*degree*C*")"), y = "Gut to Body Depth Ratio (%)")
+  labs(color = expression("Temperature ("*degree*C*")"), y = "Gut to Body Depth Ratio (%)") +
+  theme_classic()
 ```
 
 This figure shows that fish at 23C generally did not mature in August, nor do they seem to have matured in July like the 18C fish did. It would be useful for the 18C fish to have a paired measurement of July SMR with gut ratio, which would help us understand whether a relationship exists between energy allocated to maturation and SMR. 
@@ -405,7 +407,7 @@ ds2<- ds2 %>%
 
 ```{r}
 
-ds3 <- read_excel("C:/Users/s222141733/OneDrive - Deakin University/Beth Hoots/Chapter 2 (2023 Growth Performance)/Analysis/Mike datasets/stomach_size_vs_gonad_mass.xlsx", sheet = "Beth Normoxia Only")
+ds3 <- read_excel("001_Raw_data/DS3_Skeeles2024.xlsx", sheet = "Beth Normoxia Only")
 
 ds3 <- ds3 %>%
   dplyr::mutate(
@@ -923,9 +925,99 @@ ggplot() +
 
 ```
 
-Gut ratio really does not seem to have any correlation with mass-standardized SMR (any correlation seen between gut ratio and SMR could be explained by mass). Note that this figure uses the previously extrapolated values (above). For MMR, the case is a bit more complicated, as there seems to be a positive relationship between
+Gut ratio really does not seem to have any correlation with mass-standardized SMR (any correlation seen between gut ratio and SMR could be explained by mass). Note that this figure uses the previously extrapolated values (above). For MMR, the case is a bit more complicated.
+
+One way to explore this from a different perspective is to treat maturation as a binary state rather than a continuous variable. I will add a new column to data giving maturation status, and look for temperature-specific differences in SMR or MMR between the two states. Note that only 18C has a meaningful spread of data above and below the 0.74 threshold.
+
+```{r}
+data_matstat <- data %>%
+ mutate(matstat = case_when(
+    Ratio > 74 ~ "Mature", 
+    Ratio < 70 ~ "Immature",
+    is.na(Ratio) ~ NA,
+    .default = "cusp")
+  )
+
+ggplot(data = data_matstat[!is.na(data_matstat$matstat),], 
+       aes(x = factor(matstat), y = SMR_mass, fill = factor(Temp), color = factor(Temp))) +
+  geom_boxplot(position = position_dodge(width = 0.8), outlier.shape = NA, color = "white") +
+  geom_jitter(position = position_jitterdodge(jitter.width = 0.2, dodge.width = 0.8), size = 2, alpha = 0.8) +
+  scale_color_manual(values = c("deepskyblue3", "skyblue", "orange", "orangered")) +
+  scale_fill_manual(values = c("deepskyblue3", "skyblue", "orange", "orangered")) +
+  labs(x = " ", y = expression(SMR~(mg~O[2]~hr^-1~3.47~g^-1)), fill = "Temperature") +
+  guides(color = "none") +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.background = element_rect(fill = "black", color = NA),
+    panel.background = element_rect(fill = "black", color = NA),
+    panel.grid = element_blank(),
+    legend.background = element_rect(fill = "black"),
+    legend.key = element_rect(fill = "black"),
+    legend.text = element_text(color = "white"),
+    legend.title = element_text(color = "white"),
+    axis.title = element_text(color = "white"),
+    axis.text = element_text(color = "white"),
+    axis.line = element_line(color = "white"),
+    strip.background = element_rect(fill = "black"),
+    strip.text = element_text(color = "white")
+  )
+
+
+ggplot(data = data_matstat[!is.na(data_matstat$matstat),], 
+       aes(x = factor(matstat), y = MMR_mass, fill = factor(Temp), color = factor(Temp))) +
+  geom_boxplot(position = position_dodge(width = 0.8), outlier.shape = NA, color = "white") +
+  geom_jitter(position = position_jitterdodge(jitter.width = 0.2, dodge.width = 0.8), size = 2, alpha = 0.8) +
+  scale_color_manual(values = c("deepskyblue3", "skyblue", "orange", "orangered")) +
+  scale_fill_manual(values = c("deepskyblue3", "skyblue", "orange", "orangered")) +
+  labs(x = " ", y = expression(MMR~(mg~O[2]~hr^-1~3.47~g^-1)), fill = "Temperature") +
+  guides(color = "none") +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.background = element_rect(fill = "black", color = NA),
+    panel.background = element_rect(fill = "black", color = NA),
+    panel.grid = element_blank(),
+    legend.background = element_rect(fill = "black"),
+    legend.key = element_rect(fill = "black"),
+    legend.text = element_text(color = "white"),
+    legend.title = element_text(color = "white"),
+    axis.title = element_text(color = "white"),
+    axis.text = element_text(color = "white"),
+    axis.line = element_line(color = "white"),
+    strip.background = element_rect(fill = "black"),
+    strip.text = element_text(color = "white")
+  )
+```
+We could then run a linear regression test between metabolism and gut ratio at 18C. If that is unsuitable, we can investigate a t-test comparing the means of the two 18C treatment time points, however, this may be difficult due to uneven sample size in mature vs. immature fish.
+
+```{r}
+
+data_matstat_18 <- data_matstat[which(data_matstat$Temp == 18 & !is.na(data_matstat$matstat)),] 
+
+lmod_SMR <- lmer(SMR_mass ~ Ratio +(1 | ID), data = data_matstat_18)
+plot(lmod_SMR)
+summary(lmod_SMR)
+
+lmod_MMR <- lmer(MMR_mass ~ Ratio +(1 | ID), data = data_matstat_18)
+plot(lmod_MMR) #positive linear trend in residuals vs. fitted values, not suitable for linear regression analysis
+
+
+#First for SMR:
+SMRmat_test <- t.test(data_matstat_18[which(data_matstat_18$matstat == "Mature"),]$SMR_mass, 
+                      data_matstat_18[which(data_matstat_18$matstat == "Immature"),]$SMR_mass, 
+                      paired = T, 
+                      alternative = "two.sided")
+#Then for MMR:
+MMRmat_test <- t.test(data_matstat_18[which(data_matstat_18$matstat == "Mature"),]$MMR_mass, 
+                      data_matstat_18[which(data_matstat_18$matstat == "Immature"),]$MMR_mass, 
+                      paired = T, 
+                      alternative = "two.sided")
+
+```
+It has prompted for a Welch's t-test for both comparisons, this is not optimal. 
 
 ```{r, echo = F}
+
+
 ggplot(data = data, aes(x = mass, y = SMR, color = factor(Temp))) +
   geom_point() +
   geom_smooth(method = "lm", se = F) +
