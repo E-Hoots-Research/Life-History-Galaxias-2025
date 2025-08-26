@@ -342,7 +342,7 @@ fig_quad <- ggplot(B1_gut_extrap[which(B1_gut_extrap$Temp == 18),], aes(x = Date
   labs(color = expression("Temperature ("*degree*C*")"), y = "Gut to Body Depth Ratio (%)") +
   theme_bw()
 
-fig
+fig_quad
 
 ```
 
@@ -631,7 +631,7 @@ data <- data %>%
 First, we are interested to understand whether SMR is influenced by growth rate. We start by making sure that our growth (SGR) data are mass-standardized:
 
 ```{r, echo = F}
-ggplot(data = data[which(data$Temp == 18 | data$Temp == 23),], aes(x = mass, y = lead(SGR_2m), colour = factor(Temp), fill = factor(Temp))) +
+figS1 <- ggplot(data = data[which(data$Temp == 18 | data$Temp == 23),], aes(x = mass, y = lead(SGR_2m), colour = factor(Temp), fill = factor(Temp))) +
   geom_point(size = 2) +
   geom_smooth(method = "lm", se = T) +
   scale_color_manual(values =c("skyblue", "orangered"),
@@ -639,21 +639,36 @@ ggplot(data = data[which(data$Temp == 18 | data$Temp == 23),], aes(x = mass, y =
   scale_fill_manual(values =c("skyblue", "orangered"), guide = "none") +
   labs(y = "Specific Growth Rate (% mass/day)", x = "mass (g)", color = expression("Temperature ("*degree*C*")")) +
   scale_x_log10() +
-  theme_minimal(base_size = 14) +
-  theme(
-    plot.background = element_rect(fill = "black", color = NA),
-    panel.background = element_rect(fill = "black", color = NA),
-    panel.grid = element_blank(),
-    legend.background = element_rect(fill = "black"),
-    legend.key = element_rect(fill = "black"),
-    legend.text = element_text(color = "white"),
-    legend.title = element_text(color = "white"),
-    axis.title = element_text(color = "white"),
-    axis.text = element_text(color = "white"),
-    axis.line = element_line(color = "white"),
-    strip.background = element_rect(fill = "black"),
-    strip.text = element_text(color = "white")
-  )
+  theme_classic()
+
+figS1 #mass scaling of 2-month SGR
+
+figS2 <- ggplot(data = data[which(data$Temp == 18 | data$Temp == 23),], aes(x = mass, y = SGR, colour = factor(Temp), fill = factor(Temp))) +
+  geom_point(size = 2) +
+  geom_smooth(method = "lm", se = T) +
+  scale_color_manual(values =c("skyblue", "orangered"),
+    guide = guide_legend(override.aes = list(size = 4))) +
+  scale_fill_manual(values =c("skyblue", "orangered"), guide = "none") +
+  labs(y = "Specific Growth Rate (% mass/day)", x = "mass (g)", color = expression("Temperature ("*degree*C*")")) +
+  scale_x_log10() +
+  theme_classic()
+
+figS2 #mass scaling of 1-month SGR (using current mass as M1 in SGR calc — growth of following month)
+
+
+figS3 <- ggplot(data = data[which(data$Temp == 18 | data$Temp == 23),], aes(x = mass, y = lead(SGR), colour = factor(Temp), fill = factor(Temp))) +
+  geom_point(size = 2) +
+  geom_smooth(method = "lm", se = T) +
+  scale_color_manual(values =c("skyblue", "orangered"),
+    guide = guide_legend(override.aes = list(size = 4))) +
+  scale_fill_manual(values =c("skyblue", "orangered"), guide = "none") +
+  labs(y = "Specific Growth Rate (% mass/day)", x = "mass (g)", color = expression("Temperature ("*degree*C*")")) +
+  scale_x_log10() +
+  theme_classic()
+
+figS3  #mass scaling of 1-month SGR (using current mass as M2 in SGR calc — growth of month prior)
+
+
 ```
 
 With only a visual inspection, it looks like SGR is already pretty well standardized to the intermediate mass measurement when SGR is taken from a two month interval. Perhaps trending a bit too negatively for the 18C treatment, but let's give it a go as is.
@@ -662,59 +677,34 @@ Now we move on to look at the relationship between SGR and mass-standardized SMR
 
 ```{r, echo = F}
 
-# dark theme figure for presentations showing SMR vs. SGR (2 months)
-ggplot(data[which(data$ds == "B1"),], aes(x = lead(SGR_2m), y = SMR_mass, colour = factor(Temp), fill = factor(Temp))) +
+Fig1 <- ggplot(data[which(data$ds == "B1"),], aes(x = lead(SGR_2m), y = SMR_mass, colour = factor(Temp), fill = factor(Temp),  group = factor(Temp))) + #shape = factor(Month),
   geom_point(size = 2) +
   geom_smooth(method = "lm", se = T, aes(fill = factor(Temp))) +
   scale_color_manual(values =c("skyblue", "orangered"),
     guide = guide_legend(override.aes = list(size = 4))) +
   scale_fill_manual(values =c("skyblue", "orangered"), guide = "none") +
   labs(x = "Specific Growth Rate (%mass/day)", y = expression(SMR~(mg~O[2]~hr^-1~3.47~g^-1)), color = expression("Temperature ("*degree*C*")")) +
-  theme_minimal(base_size = 14) +
-  theme(
-    plot.background = element_rect(fill = "black", color = NA),
-    panel.background = element_rect(fill = "black", color = NA),
-    panel.grid = element_blank(),
-    legend.background = element_rect(fill = "black"),
-    legend.key = element_rect(fill = "black"),
-    legend.text = element_text(color = "white"),
-    legend.title = element_text(color = "white"),
-    axis.title = element_text(color = "white"),
-    axis.text = element_text(color = "white"),
-    axis.line = element_line(color = "white"),
-    strip.background = element_rect(fill = "black"),
-    strip.text = element_text(color = "white")
-  )
+  theme_classic()
+  
+Fig1 # SMR vs. SGR (2 months)
 
-# dark theme figure for presentations showing mass standardization of SMR
-ggplot(data[which(data$ds == "B1"),], aes(x = mass, y = SMR_mass, colour = factor(Temp), fill = factor(Temp))) +
+Fig2 <- ggplot(data[which(data$ds == "B1"),], aes(x = lead(SGR_2m), y = MMR_mass, colour = factor(Temp), fill = factor(Temp),  group = factor(Temp))) + #shape = factor(Month),
   geom_point(size = 2) +
   geom_smooth(method = "lm", se = T, aes(fill = factor(Temp))) +
   scale_color_manual(values =c("skyblue", "orangered"),
-    guide = guide_legend(override.aes = list(size = 4))
-  ) +
-  scale_x_log10() +
+    guide = guide_legend(override.aes = list(size = 4))) +
   scale_fill_manual(values =c("skyblue", "orangered"), guide = "none") +
-  labs(x = "mass (g)", y = expression(SMR~(mg~O[2]~hr^-1~3.47~g^-1)), color = expression("Temperature ("*degree*C*")")) +
-  theme_minimal(base_size = 14) +
-  theme(
-    plot.background = element_rect(fill = "black", color = NA),
-    panel.background = element_rect(fill = "black", color = NA),
-    panel.grid = element_blank(),
-    legend.background = element_rect(fill = "black"),
-    legend.key = element_rect(fill = "black"),
-    legend.text = element_text(color = "white"),
-    legend.title = element_text(color = "white"),
-    axis.title = element_text(color = "white"),
-    axis.text = element_text(color = "white"),
-    axis.line = element_line(color = "white"),
-    strip.background = element_rect(fill = "black"),
-    strip.text = element_text(color = "white")
-  )
+  labs(x = "Specific Growth Rate (%mass/day)", y = expression(MMR~(mg~O[2]~hr^-1~3.47~g^-1)), color = expression("Temperature ("*degree*C*")")) +
+  theme_classic()
+  
+Fig2 # MMR vs. SGR (2 months)
 
+# data wrangling for model purposes 
 
 dataB1 <- data[which(data$ds == "B1"),]
 dataB1$SGR_2m_lead <- lead(dataB1$SGR_2m)
+
+# smr vs. growth linear models
 
 lm_sgr_smr18 <- lm(SMR_mass ~ SGR_2m_lead, dataB1[which(dataB1$Temp == 18),])
 plot(lm_sgr_smr18)
@@ -726,111 +716,11 @@ plot(lm_sgr_smr23)
 hist(lm_sgr_smr23$residuals)
 summary(lm_sgr_smr23)
 
-# figure showing SGR (2 month) vs. mass standardized SMR
-ggplot(data[which(data$ds == "B1"),], aes(x = lead(SGR_2m), y = SMR_mass, colour = factor(Temp), fill = factor(Temp))) +
-  geom_point() +
-  geom_smooth(method = "lm", se = T, aes(fill = factor(Temp))) +
-  theme_bw() +
-  scale_color_manual(values =c("skyblue3", "orangered")) +
-  scale_fill_manual(values =c("skyblue3", "orangered"), guide = "none") +
-  facet_grid(.~Month) +
-  labs(x = "SGR", y = expression(SMR~(mg~O[2]~hr^-1~3.47~g^-1)), color = expression("Temperature ("*degree*C*")")) 
-
-# dark theme figure for presentations showing SGR vs. SMR
-ggplot(data[which(data$ds == "B1"),], aes(x = lead(SGR_2m), y = SMR_mass, colour = factor(Temp), fill = factor(Temp))) +
-  geom_point(size = 2) +
-  geom_smooth(method = "lm", se = T, aes(fill = factor(Temp))) +
-  facet_grid(.~Month, scales = "free_x") +
-  scale_color_manual(values =c("skyblue", "orangered"),
-    guide = guide_legend(override.aes = list(size = 4))) +
-  scale_fill_manual(values =c("skyblue", "orangered"), guide = "none") +
-  labs(x = "Specific Growth Rate (%mass/day)", y = expression(SMR~(mg~O[2]~hr^-1~3.47~g^-1)), color = expression("Temperature ("*degree*C*")")) +
-  theme_minimal(base_size = 14) +
-  theme(
-    plot.background = element_rect(fill = "black", color = NA),
-    panel.background = element_rect(fill = "black", color = NA),
-    panel.grid = element_blank(),
-    legend.background = element_rect(fill = "black"),
-    legend.key = element_rect(fill = "black"),
-    legend.text = element_text(color = "white"),
-    legend.title = element_text(color = "white"),
-    axis.title = element_text(color = "white"),
-    axis.text = element_text(color = "white"),
-    axis.line = element_line(color = "white"),
-    strip.background = element_rect(fill = "black"),
-    strip.text = element_text(color = "white")
-  )
-
 lm_sgr_smr_month <- lm(SMR_mass ~ lead(SGR_2m)*factor(Temp)*Month, dataB1)
 summary(lm_sgr_smr_month)
 anova(lm_sgr_smr_month)
 
-ggplot(data[which(data$ds == "B1"),], aes(x = lead(SGR_2m), y = MMR_mass, colour = factor(Temp), fill = factor(Temp))) +
-  geom_point() +
-  geom_smooth(method = "lm", se = T, aes(fill = factor(Temp))) +
-  theme_bw() +
-  scale_color_manual(values =c("skyblue3", "orangered")) +
-  scale_fill_manual(values =c("skyblue3", "orangered"), guide = "none") +
-  labs(x = "SGR", y = expression(MMR~(mg~O[2]~hr^-1~3.47~g^-1)), color = expression("Temperature ("*degree*C*")")) 
-
-ggplot(data[which(data$ds == "B1"),], aes(x = lead(SGR_2m), y = MMR_mass, colour = factor(Temp), fill = factor(Temp))) +
-  geom_point(size = 2) +
-  geom_smooth(method = "lm", se = T, aes(fill = factor(Temp))) +
-  scale_color_manual(values =c("skyblue", "orangered"),
-    guide = guide_legend(override.aes = list(size = 4))) +
-  scale_fill_manual(values =c("skyblue", "orangered"), guide = "none") +
-  labs(x = "Specific Growth Rate (%mass/day)", y = expression(MMR~(mg~O[2]~hr^-1~3.47~g^-1)), color = expression("Temperature ("*degree*C*")")) +
-  theme_minimal(base_size = 14) +
-  theme(
-    plot.background = element_rect(fill = "black", color = NA),
-    panel.background = element_rect(fill = "black", color = NA),
-    panel.grid = element_blank(),
-    legend.background = element_rect(fill = "black"),
-    legend.key = element_rect(fill = "black"),
-    legend.text = element_text(color = "white"),
-    legend.title = element_text(color = "white"),
-    axis.title = element_text(color = "white"),
-    axis.text = element_text(color = "white"),
-    axis.line = element_line(color = "white"),
-    strip.background = element_rect(fill = "black"),
-    strip.text = element_text(color = "white")
-  )
-
-
-ggplot(data[which(data$ds == "B1"),], aes(x = lead(SGR_2m), y = MMR_mass, colour = factor(Temp), fill = factor(Temp))) +
-  geom_point() +
-  geom_smooth(method = "lm", se = T, aes(fill = factor(Temp))) +
-  theme_bw() +
-  scale_color_manual(values =c("skyblue3", "orangered")) +
-  scale_fill_manual(values =c("skyblue3", "orangered"), guide = "none") +
-  facet_grid(.~Month) +
-  labs(x = "SGR", y = expression(MMR~(mg~O[2]~hr^-1~3.47~g^-1)), color = expression("Temperature ("*degree*C*")")) 
-
-#fig for SEB
-
-ggplot(data[which(data$ds == "B1"),], aes(x = lead(SGR_2m), y = MMR_mass, colour = factor(Temp), fill = factor(Temp))) +
-  geom_point(size = 2) +
-  geom_smooth(method = "lm", se = T, aes(fill = factor(Temp))) +
-  facet_grid(.~Month, scales = "free_x") +
-  scale_color_manual(values =c("skyblue", "orangered"),
-    guide = guide_legend(override.aes = list(size = 4))) +
-  scale_fill_manual(values =c("skyblue", "orangered"), guide = "none") +
-  labs(x = "Specific Growth Rate (%mass/day)", y = expression(MMR~(mg~O[2]~hr^-1~3.47~g^-1)), color = expression("Temperature ("*degree*C*")")) +
-  theme_minimal(base_size = 14) +
-  theme(
-    plot.background = element_rect(fill = "black", color = NA),
-    panel.background = element_rect(fill = "black", color = NA),
-    panel.grid = element_blank(),
-    legend.background = element_rect(fill = "black"),
-    legend.key = element_rect(fill = "black"),
-    legend.text = element_text(color = "white"),
-    legend.title = element_text(color = "white"),
-    axis.title = element_text(color = "white"),
-    axis.text = element_text(color = "white"),
-    axis.line = element_line(color = "white"),
-    strip.background = element_rect(fill = "black"),
-    strip.text = element_text(color = "white")
-  )
+# mmr vs. growth linear models
 
 lm_sgr_mmr18 <- lm(MMR_mass ~ SGR_2m_lead, dataB1[which(dataB1$Temp == 18),])
 plot(lm_sgr_mmr18)
@@ -851,31 +741,17 @@ anova(lm_sgr_mmr_month)
 
 ```{r, echo = F}
 # plot gut ratio vs. mass-standardized SMR, indicate extrapolated values:
-ggplot() +
+Fig3 <- ggplot() +
   geom_vline(xintercept = 74, color = "grey", linetype = "dashed", linewidth = 1.5) +
   geom_point(data = data, aes(x = Ratio, y = SMR_mass, color = factor(Temp)), size = 2) +
-  geom_point(data = data[which(data$Month == "July"),], aes(x = Ratio, y = SMR_mass, color = factor(Temp)), shape = 21, fill = "black") +
+  geom_point(data = data[which(data$Month == "July"),], aes(x = Ratio, y = SMR_mass, color = factor(Temp)), shape = 21, fill = "white") +
   geom_smooth(data = data, aes(x = Ratio, y = SMR_mass, color = factor(Temp)), method = "lm", se = F) +
   scale_color_manual(values =c("deepskyblue3", "skyblue", "orange", "orangered"),
-    guide = guide_legend(override.aes = list(size = 4))) +
+    guide = guide_legend()) +
   labs(x = "Gut Ratio (%)", y = expression(SMR~(mg~O[2]~hr^-1~3.47~g^-1)), color = "Temperature") +
-  theme_minimal(base_size = 14) +
-  theme(
-    plot.background = element_rect(fill = "black", color = NA),
-    panel.background = element_rect(fill = "black", color = NA),
-    panel.grid = element_blank(),
-    legend.background = element_rect(fill = "black"),
-    legend.key = element_rect(fill = "black"),
-    legend.text = element_text(color = "white"),
-    legend.title = element_text(color = "white"),
-    axis.title = element_text(color = "white"),
-    axis.text = element_text(color = "white"),
-    axis.line = element_line(color = "white"),
-    strip.background = element_rect(fill = "black"),
-    strip.text = element_text(color = "white")
-  )
-
-
+  theme_classic()
+  
+Fig3
 
 
 # gut ratio vs. mass-standardized SMR but using linearly extrapolated gut ratio values:
@@ -891,29 +767,17 @@ ggplot() +
 ```
 ```{r}
 # plot gut ratio vs. mass-standardized MMR, indicate extrapolated values:
-ggplot() +
+fig4 <- ggplot() +
   geom_vline(xintercept = 74, color = "grey", linetype = "dashed", linewidth = 1.5) +
   geom_point(data = data, aes(x = Ratio, y = MMR_mass, color = factor(Temp)), size = 2) +
-  geom_point(data = data[which(data$Month == "July"),], aes(x = Ratio, y = MMR_mass, color = factor(Temp)), shape = 21, fill = "black") +
+  geom_point(data = data[which(data$Month == "July"),], aes(x = Ratio, y = MMR_mass, color = factor(Temp)), shape = 21, fill = "white")+
   geom_smooth(data = data, aes(x = Ratio, y = MMR_mass, color = factor(Temp)), method = "lm", se = F) +
   scale_color_manual(values =c("deepskyblue3", "skyblue", "orange", "orangered"),
-    guide = guide_legend(override.aes = list(size = 4))) +
+    guide = guide_legend()) +
   labs(x = "Gut Ratio (%)", y = expression(MMR~(mg~O[2]~hr^-1~3.47~g^-1)), color = "Temperature") +
-  theme_minimal(base_size = 14) +
-  theme(
-    plot.background = element_rect(fill = "black", color = NA),
-    panel.background = element_rect(fill = "black", color = NA),
-    panel.grid = element_blank(),
-    legend.background = element_rect(fill = "black"),
-    legend.key = element_rect(fill = "black"),
-    legend.text = element_text(color = "white"),
-    legend.title = element_text(color = "white"),
-    axis.title = element_text(color = "white"),
-    axis.text = element_text(color = "white"),
-    axis.line = element_line(color = "white"),
-    strip.background = element_rect(fill = "black"),
-    strip.text = element_text(color = "white")
-  )
+  theme_classic()
+
+fig4
 
 # gut ratio vs. mass-standardized MMR but using linearly extrapolated gut ratio values:
 ggplot() +
@@ -996,12 +860,22 @@ We could then run a linear regression test between metabolism and gut ratio at 1
 data_matstat_18 <- data_matstat[which(data_matstat$Temp == 18 & !is.na(data_matstat$matstat)),] 
 
 lmod_SMR <- lmer(SMR_mass ~ Ratio +(1 | ID), data = data_matstat_18)
-plot(lmod_SMR)
+plot(lmod_SMR) #looks okay, maybe a slight quadratic trend that should be watched out for
 summary(lmod_SMR)
 
-lmod_MMR <- lmer(MMR_mass ~ Ratio +(1 | ID), data = data_matstat_18)
-plot(lmod_MMR) #positive linear trend in residuals vs. fitted values, not suitable for linear regression analysis
+lmod_MMR <- lmer(log(MMR_mass) ~ log(Ratio) +(1 | ID), data = data_matstat_18)
+plot(lmod_MMR) #positive linear trend in residuals vs. fitted values, no homoscedascity, not suitable for linear regression analysis
 
+#try again without random effects term (simple linear model):
+
+lmod_MMR1 <- lm(log(MMR_mass) ~ log(Ratio), data = data_matstat_18)
+plot(lmod_MMR1) #this fits much better, although now does not account for repeated measures on individuals. 
+summary(lmod_MMR1)
+
+#SMR vs. gut ratio as a simple linear model:
+lmod_SMR1 <- lm(log(SMR_mass) ~ log(Ratio), data = data_matstat_18)
+plot(lmod_SMR1)
+summary(lmod_SMR1)
 
 #First for SMR:
 SMRmat_test <- t.test(data_matstat_18[which(data_matstat_18$matstat == "Mature"),]$SMR_mass, 
@@ -1020,45 +894,17 @@ It has prompted for a Welch's t-test for both comparisons, this is not optimal.
 ```{r, echo = F}
 
 
-ggplot(data = data, aes(x = mass, y = SMR, color = factor(Temp))) +
+fig5 <- ggplot(data = data, aes(x = mass, y = SMR, color = factor(Temp))) +
   geom_point() +
   geom_smooth(method = "lm", se = F) +
   theme_bw() +
   scale_color_manual(values =c("darkblue", "skyblue3", "orange", "orangered")) +
   labs(x = "Mass (g)", y = expression(SMR~(mg~O[2]~hr^-1)), color = "Temperature") +
   scale_x_log10() +
-  scale_y_log10()
-
-#plot with dark theme for SEB Talk:
-ggplot(data = data, aes(x = mass, y = SMR, color = factor(Temp))) +
-  geom_point(size = 2) +
-  geom_smooth(method = "lm", se = FALSE, linewidth = 1) +
-  scale_color_manual(
-    values = c("deepskyblue3", "skyblue", "orange", "orangered"),
-    guide = guide_legend(override.aes = list(size = 4))
-  ) +
-  labs(
-    x = "Mass (g)",
-    y = expression(SMR~(mg~O[2]~hr^-1)),
-    color = "Temperature"
-  ) +
-  scale_x_log10() +
   scale_y_log10() +
-  theme_minimal(base_size = 14) +
-  theme(
-    plot.background = element_rect(fill = "black", color = NA),
-    panel.background = element_rect(fill = "black", color = NA),
-    panel.grid = element_blank(),
-    legend.background = element_rect(fill = "black"),
-    legend.key = element_rect(fill = "black"),
-    legend.text = element_text(color = "white"),
-    legend.title = element_text(color = "white"),
-    axis.title = element_text(color = "white"),
-    axis.text = element_text(color = "white"),
-    axis.line = element_line(color = "white"),
-    strip.background = element_rect(fill = "black"),
-    strip.text = element_text(color = "white")
-  )
+  theme_classic()
+
+fig5
 
 
 lm_SMR <- lm(log10(SMR) ~ log_mass*factor(Temp), data = data)
@@ -1079,51 +925,32 @@ lm_SMR.int.compare <- emmeans(lm_SMR, ~Temp, at = list(log_mass = log10(mean(dat
 
 lm_SMR.int <- cld(lm_SMR.int.compare)
 lm_SMR.int
+
+SMR_ints <- lm_SMR.int %>% 
+  mutate(
+    pwr_emmean = 10^(emmean),
+    pwr_lower = 10^(lower.CL),
+    pwr_upper = 10^(upper.CL))
+
+SMR_ints
+
 ```
 
 Finally, we see a narrowing-in when we plot SMR vs. mass for our four temperatures. While mass-scaling intercepts tend to increase with temperature, slopes seem to decrease. This creates an effect where, for the largest fish, there is not a visible difference in SMR by temperature treatment - they have converged to what may be a mass-imposed metabolic floor.
 
 ```{r}
 
-ggplot(data = data, aes(x = mass, y = MMR, color = factor(Temp))) +
+fig6 <- ggplot(data = data, aes(x = mass, y = MMR, color = factor(Temp))) +
   geom_point() +
   geom_smooth(method = "lm", se = F) +
   theme_bw() +
   scale_color_manual(values =c("darkblue", "skyblue3", "orange", "orangered")) +
   labs(x = "Mass (g)", y = expression(MMR~(mg~O[2]~hr^-1)), color = "Temperature") +
   scale_x_log10() +
-  scale_y_log10()
-
-#plot with dark theme for SEB Talk:
-ggplot(data = data, aes(x = mass, y = MMR, color = factor(Temp))) +
-  geom_point(size = 2) +
-  geom_smooth(method = "lm", se = FALSE, linewidth = 1) +
-  scale_color_manual(
-    values = c("deepskyblue3", "skyblue", "orange", "orangered"),
-    guide = guide_legend(override.aes = list(size = 4))
-  ) +
-  labs(
-    x = "Mass (g)",
-    y = expression(MMR~(mg~O[2]~hr^-1)),
-    color = "Temperature"
-  ) +
-  scale_x_log10() +
   scale_y_log10() +
-  theme_minimal(base_size = 14) +
-  theme(
-    plot.background = element_rect(fill = "black", color = NA),
-    panel.background = element_rect(fill = "black", color = NA),
-    panel.grid = element_blank(),
-    legend.background = element_rect(fill = "black"),
-    legend.key = element_rect(fill = "black"),
-    legend.text = element_text(color = "white"),
-    legend.title = element_text(color = "white"),
-    axis.title = element_text(color = "white"),
-    axis.text = element_text(color = "white"),
-    axis.line = element_line(color = "white"),
-    strip.background = element_rect(fill = "black"),
-    strip.text = element_text(color = "white")
-  )
+  theme_classic()
+
+fig6
 
 lm_MMR <- lm(log10(MMR) ~ log_mass*factor(Temp), data = data)
 
@@ -1137,10 +964,20 @@ lm_MMR.compare <- emmeans::lstrends(lm_MMR, ~ Temp, var = "log_mass")
 
 lm_MMR.slope <- cld(lm_MMR.compare)
 lm_MMR.slope
+
 #now compare intercepts (at grand mean mass, not log_mass = 0) of metabolism-mass scaling at different temperatures
 lm_MMR.int.compare <- emmeans(lm_MMR, ~Temp, at = list(log_mass = log10(mean(data$mass))))
 
 lm_MMR.int <- cld(lm_MMR.int.compare)
 lm_MMR.int
+
+MMR_ints <- lm_MMR.int %>% 
+  mutate(
+    pwr_emmean = 10^(emmean),
+    pwr_lower = 10^(lower.CL),
+    pwr_upper = 10^(upper.CL))
+
+MMR_ints
+
 ```
 
