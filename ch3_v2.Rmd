@@ -514,6 +514,14 @@ summary_repeats_by_temp <- fish_repeats_by_temp %>%
 fish_repeats_by_temp     # counts per fish by temperature
 summary_repeats_by_temp  # summary per temperature
 
+
+# MMR methods comparison
+ggplot(data = data[which(data$Temp == 18),], aes(x = mass, y = MMR)) +
+  geom_point(aes(color = ds)) +
+  geom_smooth(method = "lm", aes(group = Month, color = ds)) +
+  theme_bw()
+
+
 #write.csv(data, "ch3_mergeddata.csv")
 ```
 
