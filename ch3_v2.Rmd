@@ -465,8 +465,8 @@ data$Month <- factor(data$Month, levels = month_order) # assign month_order to f
 
 # summarise data for Functional Ecology replication statement:
 
-# Count repeated measures per fish
-fish_repeats <- data %>%
+# Count repeated measures per fish (this gives replication information for metabolism and mass)
+fish_repeats <- data %>% #subset data by !is.na(SGR_2m) or !is.na(Ratio) for factor-specific replication information 
   group_by(ID) %>%
   summarise(
     n_measurements = n(),   # counts rows per fish
@@ -811,12 +811,12 @@ cor(data_sgr[which(data_sgr$Temp == 18),]$SGR_2m, data_sgr[which(data_sgr$Temp =
 cor(data_sgr[which(data_sgr$Temp == 23),]$SGR_2m, data_sgr[which(data_sgr$Temp == 23),]$mass, use="complete.obs") #-0.05 corr at 23C
 
 #This tells us that correlation is stronger between SGR and mass at 18C than at 23C. Let's see if it is significant:
-SGR_diagnostic <- lm(SGR_2m ~ mass*factor(Temp), data = data_sgr)
+SGR_diagnostic <- lm(SGR_2m ~ mass, data = data_sgr)
 summary(SGR_diagnostic)
 
 #this shows a significant mass effect on SGR at 18C, and a near-significant mass effect on SGR at 23C. While the correlation is weak, it could mask our results.
 
-data_sgr$SGR_2m_resid <- resid(lmer(SGR_2m ~ mass + (1|ID), data_sgr)) #residuals of SGR are also a good option for more effectively mass-standardizing my growth measurements. 
+data_sgr$SGR_2m_resid <- resid(lmer(SGR_2m ~ mass*factor(Temp) + (1|ID), data_sgr)) #residuals of SGR are also a good option for more effectively mass-standardizing my growth measurements. 
 
 ggplot(data = data_sgr, aes(x = mass, y = SGR_2m_resid, colour = factor(Temp), fill = factor(Temp))) +
   geom_point(size = 2) +
