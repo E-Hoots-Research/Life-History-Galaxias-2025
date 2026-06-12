@@ -3,7 +3,7 @@
     "path": "C:/Users/bhoot/OneDrive - Deakin University/Beth Hoots/Chapter 3/Analysis/Life-History-Galaxias-2025/DataAnalysis_FE2026.Rmd",
     "project_path": "DataAnalysis_FE2026.Rmd",
     "type": "r_markdown",
-    "hash": "1038708372",
+    "hash": "3173304959",
     "contents": "",
     "dirty": false,
     "created": 1781281616512.0,
@@ -12,16 +12,16 @@
     "properties": {
         "source_window_id": "",
         "Source": "Source",
-        "cursorPosition": "21,4",
-        "scrollLine": "0",
+        "cursorPosition": "220,80",
+        "scrollLine": "215",
         "last_setup_crc32": ""
     },
     "folds": "",
-    "lastKnownWriteTime": 1781282255,
+    "lastKnownWriteTime": 1781282983,
     "encoding": "UTF-8",
     "collab_server": "",
     "source_window": "",
-    "last_content_update": 1781282255906,
+    "last_content_update": 1781282983864,
     "read_only": false,
     "read_only_alternatives": []
 }

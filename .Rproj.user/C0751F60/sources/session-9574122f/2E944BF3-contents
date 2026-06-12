@@ -102,13 +102,13 @@ pacman::p_load("brms",
 
 <!------------------------------------------------------------->
 
-# Read in data from Hoots et al. (in prep) - hereafter "B1" 
+# Read in data from Hoots et al. (2026) - hereafter "B1" 
 <!------------------------------------------------------------->
 
 
 ```{r}
 
-ds <- read.csv("001_Raw_Data/DS1_Hoots2025.csv") # read in data table
+ds <- read.csv("001_Raw_Data/DS1_Hoots2026.csv") # read in data table
 
 month_order <- c("April", "May", "June", "July", "August", "September", "November", "March") # assign chronological order to Month (otherwise alphabetical)
 ds$Month <- factor(ds$Month, levels = month_order) # assign month_order to factor variable "Month" in ds
@@ -218,7 +218,7 @@ This figure shows that fish at 23C generally did not mature in August, nor do th
 
 ### Extrapolating measurements of gut ratio to correspond with July SMR measurements for 18C treatment fish only, as 23C fish were not found to have matured.
 
-Using the gut ratio over time relationships established in one of Mike's papers, we determined that a second-order polynomial model would be the best fit for these extrapolations. We start with a global model for each temperature treatment, then extrapolate individual-level values for their respective July respirometry trial dates based on their residuals from that global model.
+Using the gut ratio over time relationships established in Skeeles et al. (2023), we determined that a second-order polynomial model would be the best fit for these extrapolations. We start with a global model for each temperature treatment, then extrapolate individual-level values for their respective July respirometry trial dates based on their residuals from that global model.
 
 To start, let's generate a simple linear model to show (over)predicted gut ratio values as a comparison for some extrapolated quadratic model values:
 
@@ -351,7 +351,7 @@ fig_quad
 
 ```
 
-We have now extrapolated individual-level estimates for gut-to-body-depth ratio at the July respirometry trial dates, using each fish's residuals from a global 2nd-order polynomial model. This follows the relationship found in Mike's study, as well as the timing of maturation and re-absorption of reproductive tissues - although this seems to have occurred on an accelerated timeline in these fish compared to Mike's study. These values do not differ greatly from what was seen using linear models to extrapolate, however the linear model predicted biologically unlikely gut ratio values near 100%, while this model does not.
+We have now extrapolated individual-level estimates for gut-to-body-depth ratio at the July respirometry trial dates, using each fish's residuals from a global 2nd-order polynomial model. This follows the relationship found in Skeeles et al. (2023), as well as the timing of maturation and re-absorption of reproductive tissues - although this seems to have occurred on an accelerated timeline in these fish compared to Skeeles et al. (2023). These values do not differ greatly from what was seen using linear models to extrapolate, however the linear model predicted biologically unlikely gut ratio values near 100%, while this model does not.
 
 ```{r}
 # merge extrapolated data into ds1
