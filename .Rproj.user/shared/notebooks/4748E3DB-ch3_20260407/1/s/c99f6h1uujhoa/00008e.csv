@@ -1,0 +1,7 @@
+"0",""
+"0",""
+"0","# MMR methods comparison"
+"0","ggplot(data = data[which(data$Temp == ""18a"" | data$Temp == ""18b""),], aes(x = mass, y = SMR)) +"
+"0","  geom_point(aes(color = Temp)) +"
+"0","  geom_smooth(method = ""lm"", aes(group = Month, color = Temp)) +"
+"0","  theme_bw()"

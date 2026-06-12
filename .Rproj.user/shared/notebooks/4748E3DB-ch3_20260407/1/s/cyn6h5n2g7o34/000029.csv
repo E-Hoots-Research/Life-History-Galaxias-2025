@@ -1,0 +1,8 @@
+"0","ggplot(data=B1_gut, aes(x = Date, y = Ratio, color = Temp)) +"
+"0","  geom_hline(yintercept = 74, linetype = ""dashed"", color = ""black"") +"
+"0","  geom_line(aes(group = ID), alpha = 0.3) +"
+"0","  geom_smooth(aes(group = Temp), method = ""lm"") +"
+"0","  theme_bw() +"
+"0","  scale_color_manual(values = c(""#78B7C5"", ""#F21A00"")) +"
+"0","  labs(color = expression(""Temperature (""*degree*C*"")""), y = ""Gut to Body Depth Ratio (%)"") +"
+"0","  theme_classic()"

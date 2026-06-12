@@ -1,0 +1,8 @@
+"0",""
+"0","ds1 <- ds1 %>%"
+"0","  group_by(ID) %>%"
+"0","  mutate(SGR_2m = (log(mass) - lag(log(mass), n = 2)) / as.numeric(difftime(Date, lag(Date, n = 2), units = ""days"")) * 100) %>%"
+"0","  ungroup()"
+"0",""
+"0","ds1 <- ds1[which(ds1$Month != ""April""),] # subset a new table which excludes April, use if temp treatment matters or if not SGR"
+"0",""

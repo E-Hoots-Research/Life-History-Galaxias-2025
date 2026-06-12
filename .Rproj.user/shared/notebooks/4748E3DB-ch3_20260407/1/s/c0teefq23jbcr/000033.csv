@@ -1,0 +1,5 @@
+"0","performance::check_model(lmod_SMR, ask = F)
+performance::check_model(lmod_SMR, ask = F)
+"
+"0","lmod_MMR <- lmer(log(MMR_mass) ~ log(Ratio) + (1 | ID), data = data_matstat_18)"
+"0","plot(lmod_MMR) "

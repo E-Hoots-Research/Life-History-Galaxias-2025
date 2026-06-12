@@ -1,0 +1,7 @@
+"0",""
+"0","fig6_withinset <- "
+"0","  ggdraw() +"
+"0","  draw_plot(fig6) +"
+"0","  draw_plot(fig6_inset, x = 0.6, y = .7, width = 0.3, height = 0.3)"
+"0",""
+"0","fig6"

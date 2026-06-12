@@ -1,0 +1,5 @@
+"0",""
+"0","# smr vs. growth linear models"
+"0",""
+"0","lm_sgr_smr <- lmer(SMR_mass ~ SGR_2m_resid*factor(Temp) + (1|ID), data_sgr)"
+"0","plot(lm_sgr_smr)"

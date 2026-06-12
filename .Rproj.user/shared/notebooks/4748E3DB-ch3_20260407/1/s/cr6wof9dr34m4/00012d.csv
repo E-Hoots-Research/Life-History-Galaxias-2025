@@ -1,0 +1,5 @@
+"0",""
+"0","#test also with merged 18C"
+"0",""
+"0","lm_15_SMR <- lm(log_SMR ~ log_mass, data = data[which(data$Temp == 15),])"
+"0","plot(lm_15_SMR)"

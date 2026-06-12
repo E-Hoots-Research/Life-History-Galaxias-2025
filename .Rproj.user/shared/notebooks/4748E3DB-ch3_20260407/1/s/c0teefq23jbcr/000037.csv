@@ -1,0 +1,3 @@
+"0","#MMR vs. gut ratio as a simple linear model and with ID as a fixed effect"
+"0","lmod_MMR1 <- lm(log(MMR_mass) ~ log(Ratio) + ID, data = data_matstat_18)"
+"0","plot(lmod_MMR1)  "

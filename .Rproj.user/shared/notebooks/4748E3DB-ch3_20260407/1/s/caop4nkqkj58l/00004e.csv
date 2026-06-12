@@ -1,0 +1,5 @@
+"0",""
+"0","lm_SMR <- lmer(log10(SMR) ~ log_mass*factor(Temp) + (1|ID), data = data)"
+"0",""
+"0","#check assumptions"
+"0","plot(lm_SMR)"

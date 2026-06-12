@@ -1,0 +1,7 @@
+"0","#very similar overall, let's look for any time-specific trends:"
+"0","ggplot(data = data_sgr, aes(x = Month, y = SGR_2m_resid, color = factor(Temp), fill = factor(Temp))) +"
+"0","  geom_boxplot(color = ""black"") +"
+"0","  scale_color_manual(values =c(""deepskyblue3"", ""skyblue"", ""orangered""),"
+"0","    guide = guide_legend(override.aes = list(size = 4))) +"
+"0","  scale_fill_manual(values =c(""deepskyblue3"", ""skyblue"", ""orangered"")) +"
+"0","  theme_bw()"
